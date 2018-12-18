@@ -346,6 +346,39 @@
     
     
     <article class="index-post">
+        <a class="abstract-title" href = "/2018/12/18/Java NIO/" >
+            
+                <span>Java NIO</span>
+        </a>
+        <div class="abstract-content">
+            Java NIONIO 同步非阻塞的特性简介同步非阻塞​    NIO同步非阻塞，应用于selector模型，个人认为本质就是基于epoll&amp;select的IO多路复用机制（这里有争议）。同步体现在 selector 仍然要去轮循判断 channel 是否准备好，非阻塞体现在这个过程中处理线程不会一直在等待，线程不会阻塞。减少了线程切换可以去做其他的事情。另外NIO还基于selector实现了一点异步处理。以下是个人总结的NIO的三个特点。
+
+NIO属于一个线程对应多个Channel，阻塞IO一个线程对应一个事件。select的过程依旧要轮询（同步），只是select在得不到数据...
+        </div>
+        <div class="abstract-post-meta">
+            <!-- date  -->
+            <div class="abstract-date">
+                <span class="abstract-calander iconfont-archer">&#xe676;</span><span class="abstract-time">2018/12/18</span>
+            </div>
+            <!-- tags  -->
+            
+            <div class= abstract-tags >
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "NIO">NIO</a>
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "Java">Java</a>
+    
+</div>
+            
+        </div>
+    </article>
+    
+    
+    
+    
+    
+    
+    <article class="index-post">
         <a class="abstract-title" href = "/2018/12/14/常用设计模式/" >
             
                 <span>常用设计模式</span>
@@ -368,9 +401,9 @@
             
             <div class= abstract-tags >
     
-        <a class="post-tag" href="javascript:void(0);" data-tags = "设计模式">设计模式</a>
+        <a class="post-tag" href="javascript:void(0);" data-tags = "Java">Java</a>
     
-        <a class="post-tag" href="javascript:void(0);" data-tags = "java">java</a>
+        <a class="post-tag" href="javascript:void(0);" data-tags = "设计模式">设计模式</a>
     
 </div>
             
@@ -521,9 +554,18 @@ ValueIn(系统设置) Mapper的输入数据的Va...
     
     
     
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <div class="total-and-search">
         <div class="total-archive">
-        Total : 2
+        Total : 3
         </div>
         <!-- search  -->
         
@@ -536,6 +578,11 @@ ValueIn(系统设置) Mapper的输入数据的Va...
     
     <div class="archive-year"> 2018 </div>
     <ul class="year-list">
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">12/18</span><a class="archive-post-title" href= "/2018/12/18/Java NIO/" >Java NIO</a>
+        </li>
     
     
         <li class="archive-post-item">
@@ -555,6 +602,10 @@ ValueIn(系统设置) Mapper的输入数据的Va...
         <span class="sidebar-tag-name" data-tags="Hadoop"><span class="iconfont-archer">&#xe606;</span>Hadoop</span>
     
         <span class="sidebar-tag-name" data-tags="MapReduce"><span class="iconfont-archer">&#xe606;</span>MapReduce</span>
+    
+        <span class="sidebar-tag-name" data-tags="NIO"><span class="iconfont-archer">&#xe606;</span>NIO</span>
+    
+        <span class="sidebar-tag-name" data-tags="Java"><span class="iconfont-archer">&#xe606;</span>Java</span>
     
         <span class="sidebar-tag-name" data-tags="设计模式"><span class="iconfont-archer">&#xe606;</span>设计模式</span>
     
@@ -595,7 +646,11 @@ jsonContent:
     
         <span class="sidebar-category-name" data-categories="Hadoop"><span class="iconfont-archer">&#xe60a;</span>Hadoop</span>
     
+        <span class="sidebar-category-name" data-categories="Java"><span class="iconfont-archer">&#xe60a;</span>Java</span>
+    
         <span class="sidebar-category-name" data-categories="设计模式"><span class="iconfont-archer">&#xe60a;</span>设计模式</span>
+    
+        <span class="sidebar-category-name" data-categories="java"><span class="iconfont-archer">&#xe60a;</span>java</span>
     
     </div>
     <div class="iconfont-archer sidebar-categories-empty">&#xe678;</div>
