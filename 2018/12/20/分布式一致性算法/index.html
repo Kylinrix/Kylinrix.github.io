@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="">
+    <!-- title -->
+
+
+
+
+<!-- keywords -->
+
+
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" >
+    <meta name="author" content="Ky Li">
+    <meta name="renderer" content="webkit">
+    <meta name="copyright" content="Ky Li">
+    
+    <meta name="keywords" content="hexo,hexo-theme,hexo-blog">
+    
+    <meta name="description" content="">
+    <meta http-equiv="Cache-control" content="no-cache">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <title>分布式一致性算法 · Kylinrix</title>
+    <style type="text/css">
+    @font-face {
+        font-family: 'Oswald-Regular';
+        src: url("/font/Oswald-Regular.ttf");
+    }
+
+    body {
+        margin: 0;
+    }
+
+    header,
+    footer,
+    .back-top,
+    .sidebar,
+    .container,
+    .site-intro-meta,
+    .toc-wrapper {
+        display: none;
+    }
+
+    .site-intro {
+        position: relative;
+        z-index: 3;
+        width: 100%;
+        /* height: 50vh; */
+        overflow: hidden;
+    }
+
+    .site-intro-placeholder {
+        position: absolute;
+        z-index: -2;
+        top: 0;
+        left: 0;
+        width: calc(100% + 300px);
+        height: 100%;
+        background: repeating-linear-gradient(-45deg, #444 0, #444 80px, #333 80px, #333 160px);
+        background-position: center center;
+        transform: translate3d(-226px, 0, 0);
+        animation: gradient-move 2.5s ease-out 0s infinite;
+    }
+
+    @keyframes gradient-move {
+        0% {
+            transform: translate3d(-226px, 0, 0);
+        }
+        100% {
+            transform: translate3d(0, 0, 0);
+        }
+    }
+
+</style>
+
+    <link rel="preload" href= "/css/style.css?v=20180824" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <link rel="stylesheet" href= "/css/mobile.css?v=20180824" media="(max-width: 980px)">
+    
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    
+    <!-- /*! loadCSS. [c]2017 Filament Group, Inc. MIT License */
+/* This file is meant as a standalone workflow for
+- testing support for link[rel=preload]
+- enabling async CSS loading in browsers that do not support rel=preload
+- applying rel preload css once loaded, whether supported or not.
+*/ -->
+<script>
+(function( w ){
+	"use strict";
+	// rel=preload support test
+	if( !w.loadCSS ){
+		w.loadCSS = function(){};
+	}
+	// define on the loadCSS obj
+	var rp = loadCSS.relpreload = {};
+	// rel=preload feature support test
+	// runs once and returns a function for compat purposes
+	rp.support = (function(){
+		var ret;
+		try {
+			ret = w.document.createElement( "link" ).relList.supports( "preload" );
+		} catch (e) {
+			ret = false;
+		}
+		return function(){
+			return ret;
+		};
+	})();
+
+	// if preload isn't supported, get an asynchronous load by using a non-matching media attribute
+	// then change that media back to its intended value on load
+	rp.bindMediaToggle = function( link ){
+		// remember existing media attr for ultimate state, or default to 'all'
+		var finalMedia = link.media || "all";
+
+		function enableStylesheet(){
+			link.media = finalMedia;
+		}
+
+		// bind load handlers to enable media
+		if( link.addEventListener ){
+			link.addEventListener( "load", enableStylesheet );
+		} else if( link.attachEvent ){
+			link.attachEvent( "onload", enableStylesheet );
+		}
+
+		// Set rel and non-applicable media type to start an async request
+		// note: timeout allows this to happen async to let rendering continue in IE
+		setTimeout(function(){
+			link.rel = "stylesheet";
+			link.media = "only x";
+		});
+		// also enable media after 3 seconds,
+		// which will catch very old browsers (android 2.x, old firefox) that don't support onload on link
+		setTimeout( enableStylesheet, 3000 );
+	};
+
+	// loop through link elements in DOM
+	rp.poly = function(){
+		// double check this to prevent external calls from running
+		if( rp.support() ){
+			return;
+		}
+		var links = w.document.getElementsByTagName( "link" );
+		for( var i = 0; i < links.length; i++ ){
+			var link = links[ i ];
+			// qualify links to those with rel=preload and as=style attrs
+			if( link.rel === "preload" && link.getAttribute( "as" ) === "style" && !link.getAttribute( "data-loadcss" ) ){
+				// prevent rerunning on link
+				link.setAttribute( "data-loadcss", true );
+				// bind listeners to toggle media back
+				rp.bindMediaToggle( link );
+			}
+		}
+	};
+
+	// if unsupported, run the polyfill
+	if( !rp.support() ){
+		// run once at least
+		rp.poly();
+
+		// rerun poly on an interval until onload
+		var run = w.setInterval( rp.poly, 500 );
+		if( w.addEventListener ){
+			w.addEventListener( "load", function(){
+				rp.poly();
+				w.clearInterval( run );
+			} );
+		} else if( w.attachEvent ){
+			w.attachEvent( "onload", function(){
+				rp.poly();
+				w.clearInterval( run );
+			} );
+		}
+	}
+
+
+	// commonjs
+	if( typeof exports !== "undefined" ){
+		exports.loadCSS = loadCSS;
+	}
+	else {
+		w.loadCSS = loadCSS;
+	}
+}( typeof global !== "undefined" ? global : this ) );
+</script>
+
+    <link rel="icon" href= "/assets/head.png" />
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/webfontloader@1.6.28/webfontloader.min.js" as="script" />
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js" as="script" />
+    <link rel="preload" href="/scripts/main.js" as="script" />
+    <link rel="preload" as="font" href="/font/Oswald-Regular.ttf" crossorigin>
+    <link rel="preload" as="font" href="https://at.alicdn.com/t/font_327081_1dta1rlogw17zaor.woff" crossorigin>
+    
+    <!-- fancybox -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.js" defer></script>
+    <!-- 百度统计  -->
+    
+    <!-- 谷歌统计  -->
+    
+</head>
+
+    
+        <body class="post-body">
+    
+    
+<header class="header">
+
+    <div class="read-progress"></div>
+    <div class="header-sidebar-menu">&#xe775;</div>
+    <!-- post页的toggle banner  -->
+    
+    <div class="banner">
+            <div class="blog-title">
+                <a href="/" >Kylinrix</a>
+            </div>
+            <div class="post-title">
+                <a href="#" class="post-name">分布式一致性算法</a>
+            </div>
+    </div>
+    
+    <a class="home-link" href=/>Kylinrix</a>
+</header>
+    <div class="wrapper">
+        <div class="site-intro" style="
+
+
+
+
+
+
+
+height:50vh;
+">
+    
+    <!-- 主页  -->
+    
+    
+    <!-- 404页  -->
+            
+    <div class="site-intro-placeholder"></div>
+    <div class="site-intro-img" style="background-image: url(/intro/post-bg.jpg)"></div>
+    <div class="site-intro-meta">
+        <!-- 标题  -->
+        <h1 class="intro-title">
+            <!-- 主页  -->
+            
+            分布式一致性算法
+            <!-- 404 -->
+            
+        </h1>
+        <!-- 副标题 -->
+        <p class="intro-subtitle">
+            <!-- 主页副标题  -->
+            
+            
+            <!-- 404 -->
+            
+        </p>
+        <!-- 文章页meta -->
+        
+            <div class="post-intros">
+                <!-- 文章页标签  -->
+                
+                    <div class= post-intro-tags >
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "分布式">分布式</a>
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "Paxos算法">Paxos算法</a>
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "Raft算法">Raft算法</a>
+    
+        <a class="post-tag" href="javascript:void(0);" data-tags = "Zookeeper">Zookeeper</a>
+    
+</div>
+                
+                
+                    <div class="post-intro-read">
+                        <span>字数统计: <span class="post-count word-count">6.2k</span>阅读时长: <span class="post-count reading-time">23 min</span></span>
+                    </div>
+                
+                <div class="post-intro-meta">
+                    <span class="post-intro-calander iconfont-archer">&#xe676;</span>
+                    <span class="post-intro-time">2018/12/20</span>
+                    
+                    <span class="shareWrapper">
+                        <span class="iconfont-archer shareIcon">&#xe71d;</span>
+                        <span class="shareText">Share</span>
+                        <ul class="shareList">
+                            <li class="iconfont-archer share-qr" data-type="qr">&#xe75b;
+                                <div class="share-qrcode"></div>
+                            </li>
+                            <li class="iconfont-archer" data-type="weibo">&#xe619;</li>
+                            <li class="iconfont-archer" data-type="qzone">&#xe62e;</li>
+                            <li class="iconfont-archer" data-type="twitter">&#xe634;</li>
+                            <li class="iconfont-archer" data-type="facebook">&#xe67a;</li>
+                        </ul>
+                    </span>
+                </div>
+            </div>
+        
+    </div>
+</div>
+        <script>
+ 
+  // get user agent
+  var browser = {
+    versions: function () {
+      var u = window.navigator.userAgent;
+      return {
+        userAgent: u,
+        trident: u.indexOf('Trident') > -1, //IE内核
+        presto: u.indexOf('Presto') > -1, //opera内核
+        webKit: u.indexOf('AppleWebKit') > -1, //苹果、谷歌内核
+        gecko: u.indexOf('Gecko') > -1 && u.indexOf('KHTML') == -1, //火狐内核
+        mobile: !!u.match(/AppleWebKit.*Mobile.*/), //是否为移动终端
+        ios: !!u.match(/\(i[^;]+;( U;)? CPU.+Mac OS X/), //ios终端
+        android: u.indexOf('Android') > -1 || u.indexOf('Linux') > -1, //android终端或者uc浏览器
+        iPhone: u.indexOf('iPhone') > -1 || u.indexOf('Mac') > -1, //是否为iPhone或者安卓QQ浏览器
+        iPad: u.indexOf('iPad') > -1, //是否为iPad
+        webApp: u.indexOf('Safari') == -1, //是否为web应用程序，没有头部与底部
+        weixin: u.indexOf('MicroMessenger') == -1, //是否为微信浏览器
+        uc: u.indexOf('UCBrowser') > -1 //是否为android下的UC浏览器
+      };
+    }()
+  }
+  console.log("userAgent:" + browser.versions.userAgent);
+
+  // callback
+  function fontLoaded() {
+    console.log('font loaded');
+    if (document.getElementsByClassName('site-intro-meta')) {
+      document.getElementsByClassName('intro-title')[0].classList.add('intro-fade-in');
+      document.getElementsByClassName('intro-subtitle')[0].classList.add('intro-fade-in');
+      var postIntros = document.getElementsByClassName('post-intros')[0]
+      if (postIntros) {
+        postIntros.classList.add('post-fade-in');
+      }
+    }
+  }
+
+  // UC不支持跨域，所以直接显示
+  function asyncCb(){
+    if (browser.versions.uc) {
+      console.log("UCBrowser");
+      fontLoaded();
+    } else {
+      WebFont.load({
+        custom: {
+          families: ['Oswald-Regular']
+        },
+        loading: function () {  //所有字体开始加载
+          // console.log('loading');
+        },
+        active: function () {  //所有字体已渲染
+          fontLoaded();
+        },
+        inactive: function () { //字体预加载失败，无效字体或浏览器不支持加载
+          console.log('inactive: timeout');
+          fontLoaded();
+        },
+        timeout: 5000 // Set the timeout to two seconds
+      });
+    }
+  }
+
+  function asyncErr(){
+    console.warn('script load from CDN failed, will load local script')
+  }
+
+  // load webfont-loader async, and add callback function
+  function async(u, cb, err) {
+    var d = document, t = 'script',
+      o = d.createElement(t),
+      s = d.getElementsByTagName(t)[0];
+    o.src = u;
+    if (cb) { o.addEventListener('load', function (e) { cb(null, e); }, false); }
+    if (err) { o.addEventListener('error', function (e) { err(null, e); }, false); }
+    s.parentNode.insertBefore(o, s);
+  }
+
+  var asyncLoadWithFallBack = function(arr, success, reject) {
+      var currReject = function(){
+        reject()
+        arr.shift()
+        if(arr.length)
+          async(arr[0], success, currReject)
+        }
+
+      async(arr[0], success, currReject)
+  }
+
+  asyncLoadWithFallBack([
+    "https://cdn.jsdelivr.net/npm/webfontloader@1.6.28/webfontloader.min.js", 
+    "https://cdn.bootcss.com/webfont/1.6.28/webfontloader.js",
+    "/lib/webfontloader.min.js"
+  ], asyncCb, asyncErr)
+</script>        
+        <img class="loading" src="/assets/loading.svg" style="display: block; margin: 6rem auto 0 auto; width: 6rem; height: 6rem;" />
+        <div class="container container-unloaded">
+            <main class="main post-page">
+    <article class="article-entry">
+        <h1 id="分布式一致性算法"><a href="#分布式一致性算法" class="headerlink" title="分布式一致性算法"></a>分布式一致性算法</h1><p>分布式一致性算法包括Paxos和Raft、ZAB协议</p>
+<h2 id="Paxos算法"><a href="#Paxos算法" class="headerlink" title="Paxos算法"></a>Paxos算法</h2><p>​    Paxos算法是基于消息传递且具有高度容错特性的一致性算法，是目前公认的解决分布式一致性问题最有效的算法之一。来自Stanford的新的分布式协议研究称为Raft，它是一个为真实世界应用建立的协议，主要注重协议的落地性和可理解性。</p>
+<p>​    Paxos算法分为Basic Paxos，Multi Paxos、Fast Paxos。</p>
+<h3 id="Basic-Paxos"><a href="#Basic-Paxos" class="headerlink" title="Basic Paxos"></a>Basic Paxos</h3><h4 id="角色"><a href="#角色" class="headerlink" title="角色"></a>角色</h4><p>在Paxos算法中，有三种角色：</p>
+<ul>
+<li>Proposer：提议者，只要Proposer发的提案被半数以上Acceptor接受，Proposer就认为该提案通过了。否则就把提案号加1，尝试再次发送提案。</li>
+<li>Acceptor：投票者，只要Acceptor接受了某个提案，Acceptor就认为该提案里的value被选定了。</li>
+<li>Learners：学习者/记录员，Acceptor告诉Learner哪个value被选定，Learner就认为那个value被选定。</li>
+</ul>
+<p>​    在Basic Paxos算法中，<strong>一个进程可能同时充当多种角色</strong>。比如一个进程可能既是Proposer又是Acceptor又是Learner。</p>
+<h4 id="请求与响应"><a href="#请求与响应" class="headerlink" title="请求与响应"></a>请求与响应</h4><p>Basic Paxos中包括两种请求和两种响应，我们按照顺序来介绍。</p>
+<ul>
+<li>Prepare请求：提案号N同步请求</li>
+<li>Promise响应：提案号N同步响应</li>
+<li>Accept请求：提案N，V同步请求</li>
+<li>Accepted响应：提案N，V同步响应</li>
+</ul>
+<h4 id="流程"><a href="#流程" class="headerlink" title="流程"></a>流程</h4><p>Paxos算法简单分为四种信号状态</p>
+<ol>
+<li>Prepare:Proposer向所有已知的Accepter提出一个Prepare请求，请求包括提案号N，这个提案号大于Proposer之前提过的提案号。</li>
+<li>Promise：如果N大于Accepter之前所响应过的提案号，则接受N这个提案号，发送Promise响应，否则拒绝。</li>
+<li>Accept：Proposer所收到Accepter的Promise响应达到了多数（一般为半数以上），Proposer则会发送Accept请求，该请求包括提案号N与提案内容V。</li>
+<li>Accepted_1：只要该Acceptor没有对编号大于N的Prepare请求做出过响应，它就接受该提案，发送Accepted响应，否则就拒绝。</li>
+<li>Accepted_2：Proposer所接收的该事件Accepted响应达到了多数，则提案通过，否则，将提案号+1再次重复第一步步骤；并将表决结果告知Learner。</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Client   Proposer      Acceptor     Learner</span><br><span class="line">   |         |          |  |  |       |  |</span><br><span class="line">   X--------&gt;|          |  |  |       |  |  Request</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Prepare(1)</span><br><span class="line">   |         |&lt;---------X--X--X       |  |  Promise(1,&#123;Va,Vb,Vc&#125;)</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Accept!(1,Vn)</span><br><span class="line">   |         |&lt;---------X--X--X------&gt;|-&gt;|  Accepted(1,Vn)</span><br><span class="line">   |&lt;---------------------------------X--X  Response</span><br><span class="line">   |         |          |  |  |       |  |</span><br></pre></td></tr></table></figure>
+<p>Paxos算法分为两个阶段。<strong>分为提案号N同步，和提案（N，V）同步</strong>，具体如下：</p>
+<ul>
+<li><p>阶段一：选出提案编号最大的Proposer（提案号N同步）</p>
+<p>(a) Proposer选择一个Proposal编号N，然后向半数以上的Acceptor发送编号为N的Prepare请求。</p>
+<p>(b) 如果一个Acceptor收到一个编号为N的Prepare请求，且N大于该Acceptor已经响应过的所有Prepare请求的编号，那么它就会将它已经接受过的编号最大的提案（如果有的话）作为响应反馈给Proposer，同时该Acceptor承诺不再接受任何编号小于N的提案。</p>
+<p>​    如果N小于等于该Acceptor之前批准过的任意Prepare请求的编号，则拒绝该编号N的Prepare请求。</p>
+</li>
+</ul>
+<ul>
+<li><p>阶段二：尝试与某一Proposer达成一致（提案N，V同步）</p>
+<p>(a)    如果Proposer收到半数以上Acceptor对其发出的编号为N的Proposal请求的响应，那么它就会发送一个针对[N,V]提案的Accept请求给半数以上的Acceptor。</p>
+<p>​    注意：V就是收到的响应中编号最大的提案的value，如果响应中不包含任何提案，那么V就由Proposer自己决定。</p>
+<p>(b)     如果Acceptor收到一个针对编号为N的提案的Accept请求，</p>
+<p>​    只要该Acceptor没有对编号大于N的Prepare请求做出过响应，它就接受该提案，</p>
+<p>​    只要该Acceptor对编号大于N的Prepare请求做出过响应，它就拒绝该提案，</p>
+</li>
+</ul>
+<h4 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h4><p>​    <strong>实现复杂</strong></p>
+<p>​        多个Proposer的实现比较复杂，节点之间的通信量大。</p>
+<p>​    <strong>效率低</strong></p>
+<p>​        需要进行两轮RPC调用，共计四次通信才能确定一个提案，效率较低。</p>
+<p>​    <strong>活锁</strong></p>
+<p>​        Basic Paxos可能出现活锁，如果多个Proposer竞争提案号，就会出现长时间没有提案能够接受的情况。下图为活锁示例。解决方案为提案失败则随机时间重发，不过这样的实现方式，效率依旧较低。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">Client   Proposer        Acceptor     Learner</span><br><span class="line">   |      |             |  |  |       |  |</span><br><span class="line">   X-----&gt;|             |  |  |       |  |  Request</span><br><span class="line">   |      X------------&gt;|-&gt;|-&gt;|       |  |  Prepare(1)</span><br><span class="line">   |      |&lt;------------X--X--X       |  |  Promise(1,&#123;null,null,null&#125;)</span><br><span class="line">   |      ! otherP      |  |  |       |  |  !! LEADER FAILS</span><br><span class="line">   |         |          |  |  |       |  |  !! NEW LEADER (knows last number was 1)</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Prepare(2)</span><br><span class="line">   |         |&lt;---------X--X--X       |  |  Promise(2,&#123;null,null,null&#125;)</span><br><span class="line">   |      |  |          |  |  |       |  |  !! OLD LEADER recovers</span><br><span class="line">   |      |  |          |  |  |       |  |  !! OLD LEADER tries 2, denied</span><br><span class="line">   |      X------------&gt;|-&gt;|-&gt;|       |  |  Prepare(2)</span><br><span class="line">   |      |&lt;------------X--X--X       |  |  Nack(2)</span><br><span class="line">   |      |  |          |  |  |       |  |  !! OLD LEADER tries 3</span><br><span class="line">   |      X------------&gt;|-&gt;|-&gt;|       |  |  Prepare(3)</span><br><span class="line">   |      |&lt;------------X--X--X       |  |  Promise(3,&#123;null,null,null&#125;)</span><br><span class="line">   |      |  |          |  |  |       |  |  !! NEW LEADER proposes, denied</span><br><span class="line">   |      |  X---------&gt;|-&gt;|-&gt;|       |  |  Accept!(2,Va)</span><br><span class="line">   |      |  |&lt;---------X--X--X       |  |  Nack(3)</span><br><span class="line">   |      |  |          |  |  |       |  |  !! NEW LEADER tries 4</span><br><span class="line">   |      |  X---------&gt;|-&gt;|-&gt;|       |  |  Prepare(4)</span><br><span class="line">   |      |  |&lt;---------X--X--X       |  |  Promise(4,&#123;null,null,null&#125;)</span><br><span class="line">   |      |  |          |  |  |       |  |  !! OLD LEADER proposes, denied</span><br><span class="line">   |      X------------&gt;|-&gt;|-&gt;|       |  |  Accept!(3,Vb)</span><br><span class="line">   |      |&lt;------------X--X--X       |  |  Nack(4)</span><br><span class="line">   |      |  |          |  |  |       |  |  ... and so on ...</span><br></pre></td></tr></table></figure>
+<p>​    </p>
+<h3 id="Multi-Paxos"><a href="#Multi-Paxos" class="headerlink" title="Multi Paxos"></a>Multi Paxos</h3><h4 id="角色-1"><a href="#角色-1" class="headerlink" title="角色"></a>角色</h4><ul>
+<li>Leader：<strong>唯一的Proposer</strong>（强Leader状态），只要Leader发的提案被半数以上Acceptor接受，Leader就认为该提案通过了。</li>
+<li>Acceptor：只要Acceptor接受了某个提案，Acceptor就认为该提案里的value被选定了。</li>
+<li>Learners：Acceptor告诉Learner哪个value被选定，Learner就认为那个value被选定。</li>
+</ul>
+<h4 id="流程-1"><a href="#流程-1" class="headerlink" title="流程"></a>流程</h4><p>​    Multi Paxos和Basic Paxos 状态相似，有四个信号状态。不过之前的提案号N同步的状态只有在开始时使用（类似于选举，但不完全是，后面会有提到），而后面集群中的<strong>绝大部分时间</strong>只会有Accept和Accepted两种情况。</p>
+<ol>
+<li><hr>
+<p>Proposer（leader）向所有已知的Accepter提出一个Prepare请求，请求包括提案号N，这个提案号大于Proposer之前提过的提案号。</p>
+</li>
+<li><p>Promise：如果N大于Accepter之前所响应过的提案号，则接受N这个提案号，发送Promise响应，否则拒绝。<strong>其中Promise包括了N和新的事件号I（I可以理解为约定的新提案号，后面流程的N则不会改变，N相当于Acceptor识别这个Leader的标识）</strong></p>
+</li>
+<li><p>Accept：Proposer所收到的Promise接受响应达到了多数（一般为半数以上），Proposer则会发送Accept请求，该请求包括提案号N与事件号I和提案内容V（N，I，V）</p>
+</li>
+<li><p>Accepted_1：只要该Acceptor没有对<strong>提案号为N且事件编号大于I</strong>的Accept请求做出过响应，它就接受该提案，发送Accepted响应，否则就拒绝。</p>
+</li>
+<li><p>Accepted_2：</p>
+<p>​            1）如果Acceptor无返回值，则自由决定一个Value；</p>
+<p>​            2）如果有返回值，则选择事件号I最大的一个；</p>
+<p>​            Proposer所接收的该事件Accepted响应达到了多数，则提案通过，否则，将提案号+1再次重复第一步步骤；Acceptor把表决结果发送到Learner。</p>
+<hr>
+</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Client   Proposer(Lead) Acceptor     Learner</span><br><span class="line">   |         |          |  |  |       |  | --- First Request ---</span><br><span class="line">   X--------&gt;|          |  |  |       |  |  Request</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Prepare(N)</span><br><span class="line">   |         |&lt;---------X--X--X       |  |  Promise(N,I,&#123;Va,Vb,Vc&#125;)</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Accept!(N,I,V)</span><br><span class="line">   |         |&lt;---------X--X--X------&gt;|-&gt;|  Accepted(N,I,V)</span><br><span class="line">   |&lt;---------------------------------X--X  Response</span><br><span class="line">   |         |          |  |  |       |  |</span><br></pre></td></tr></table></figure>
+<p>接下来的操作则是通过Leader的一次Accept请求即可完成一次提案，比起Basic Paxos两轮确定更有效率。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Client   Proposer(Lead) Acceptor     Learner</span><br><span class="line">   |         |          |  |  |       |  |  --- Following Requests ---</span><br><span class="line">   X--------&gt;|          |  |  |       |  |  Request</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|       |  |  Accept!(N,I+1,W)</span><br><span class="line">   |         |&lt;---------X--X--X------&gt;|-&gt;|  Accepted(N,I+1,W)</span><br><span class="line">   |&lt;---------------------------------X--X  Response</span><br><span class="line">   |         |          |  |  |       |  |</span><br></pre></td></tr></table></figure>
+<h4 id="确定Leader"><a href="#确定Leader" class="headerlink" title="确定Leader"></a>确定Leader</h4><p>​    之前提到在第一次Proposer和Acceptor交互时要确定Leader，那是如何确定Leader的呢，个人理解是哪个结点提交提案越快越频繁则越有可能成为Leader。</p>
+<p>​    需要注意的一点是，Multi Paxos算法是允许并行提交的，意思是Multi Paxos并不是完全的禁止其他节点发送Prepare请求。只是Multi Paxos在设计时有一条规则：</p>
+<p>​    <strong>结点收到其他节点的Accept，则进行一段时间的拒绝提交提案（暂时放弃Proposer身份）。</strong></p>
+<p>​    Leader的作用是希望大部分时间都只有一个节点在提交，这样才能最大发挥Mulit-Paxos的优化效果。</p>
+<p>​    所以最好在Leader可用的情况下，不要打破这种状态，各个节点都想着不要去打破这种连续的Accept状态。<strong>而当有一个节点（即可能的Leader）在连续的Accept，那么其他节点必然持续不断的拒绝提交提案。</strong>这个Leader就这样无形的被产生出来了。</p>
+<p>​    </p>
+<h3 id="Fast-Paxos"><a href="#Fast-Paxos" class="headerlink" title="Fast Paxos"></a>Fast Paxos</h3><p>注意这里的Classic Paxos和Basic与Multi都不太相同。</p>
+<h4 id="角色-2"><a href="#角色-2" class="headerlink" title="角色"></a>角色</h4><ul>
+<li>Client/Proposer/Learner：负责提案并执行提案</li>
+<li>Coordinator：Proposer协调者，可为多个，Client通过Coordinator进行提案</li>
+<li>Leader：在众多的Coordinator中指定一个作为Leader</li>
+<li>Acceptor：负责对Proposal进行投票表决</li>
+</ul>
+<h4 id="Any消息"><a href="#Any消息" class="headerlink" title="Any消息"></a>Any消息</h4><p>​    Acceptor在接收到Any消息后可做一些开始Fast Round的初始化工作，等待Proposer提交真正的Value。Any消息的意思是Acceptor可以做任意的处理。 个人理解，Any消息类似于一种信号，由Leader发送给Acceptor后，Acceptor<strong>乐观</strong>地接收其他Proposer的提案，而如果发生冲突（即收到的提案号或者内容冲突），则需要Leader再次发送最新的提案编号来同步，修复冲突。</p>
+<p>​    所以说Fast Paxos是基于乐观锁的思想，Acceptor认为冲突是一件不经常发生的事件。这样的架构在并发较大、事件较多时效率较低。</p>
+<h4 id="流程-2"><a href="#流程-2" class="headerlink" title="流程"></a>流程</h4><p>让我们来回忆一下Classic Paxos中一个提案是如何确定的（排除第一次连接）</p>
+<ul>
+<li>Accept：Leader提交proposal到Acceptor</li>
+<li>Accepted_1：Acceptor回应已经参与投票的最大Proposer编号和选择的Value</li>
+<li>Accepted_2：Leader收集Acceptor的接受返回值<ul>
+<li>1）<strong>如果Acceptor无返回值，则自行决定一个</strong></li>
+<li>2）如果有返回值，则选择Proposer编号最大的一个</li>
+<li>Proposer所接收的该事件Accepted响应达到了多数，则提案通过，否则，将提案号+1再次重复第一步步骤；Acceptor把表决结果发送到Learner。</li>
+</ul>
+</li>
+</ul>
+<p>Classic Paxos中，从每次Proposer提案到决议被学习，需要三个通信步骤：</p>
+<blockquote>
+<p>​    Proposer—–Leader—–Acceptor—–Learner</p>
+</blockquote>
+<p>​    如果Leader可以自行决定一个Value，则可以让Proposer提交这个Value，Leader自己则退出通信过程。只要之后的过程运行正常，Leader始终不参与通信，一直有Proposer直接提交Value到Acceptor，从而把Classic Paxos的三阶段通信减少为两阶段，这便是Fast Paxos的由来。</p>
+<ul>
+<li>Accept：Leader提交proposal到Acceptor</li>
+<li>Accepted_1：Acceptor回应已经参与投票的最大Proposer编号和选择的Value</li>
+<li>Accepted_2：Leader收集Acceptor的接受返回值<ul>
+<li><strong>1）如果Acceptor无返回值，则发送一个Any消息给Acceptor，之后Acceptor便等待Proposer提交Value。</strong></li>
+<li>2）如果有返回值，则选择Proposer编号最大的一个</li>
+<li>Proposer所接收的该事件Accepted响应达到了多数，则提案通过，否则，将提案号+1再次重复第一步步骤；Acceptor把表决结果发送到Learner<strong>（包括Leader）</strong></li>
+</ul>
+</li>
+</ul>
+<p>形式消息仅需两个通信步骤</p>
+<blockquote>
+<p>​    Proposer—–Acceptor—–Learner</p>
+</blockquote>
+<h5 id="无冲突流程"><a href="#无冲突流程" class="headerlink" title="无冲突流程"></a>无冲突流程</h5><blockquote>
+<p>​    Fast Paxos generalizes Basic Paxos to reduce end-to-end message delays. In Basic Paxos, the message delay from client request to learning is 3 message delays. Fast Paxos allows 2 message delays, but requires that</p>
+<p>​     (1) the system be comprised by 3f+ 1 acceptors to tolerate up to f faults (instead of the classic 2f+1), and </p>
+<p>​    (2) the Client to send its request to multiple destinations.</p>
+<p>​    Fast Paxos概括了Basic Paxos以减少端到端消息延迟。在Basic Paxos中，从客户端请求到学习的消息延迟是3个消息延迟。 Fast Paxos允许2个消息延迟，但要求</p>
+<p>​    （1）系统由3f + 1个接收器组成以容忍多达f个故障（而不是经典的2f + 1），以及</p>
+<p>​    （2）客户端将其请求发送到多个目的地。</p>
+</blockquote>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Client    Leader         Acceptor      Learner</span><br><span class="line">   |         |          |  |  |  |       |  |</span><br><span class="line">   |         X---------&gt;|-&gt;|-&gt;|-&gt;|       |  |  Any(N,I,Recovery)</span><br><span class="line">   |         |          |  |  |  |       |  |</span><br><span class="line">   X-------------------&gt;|-&gt;|-&gt;|-&gt;|       |  |  Accept!(N,I,W)</span><br><span class="line">   |         |&lt;---------X--X--X--X------&gt;|-&gt;|  Accepted(N,I,W)</span><br><span class="line">   |&lt;------------------------------------X--X  Response(W)</span><br><span class="line">   |         |          |  |  |  |       |  |</span><br></pre></td></tr></table></figure>
+<h5 id="冲突流程"><a href="#冲突流程" class="headerlink" title="冲突流程"></a>冲突流程</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">Client   Leader      Acceptor     Learner</span><br><span class="line"> |  |      |        |  |  |  |      |  |</span><br><span class="line"> |  |      |        |  |  |  |      |  |</span><br><span class="line"> |  |      |        |  |  |  |      |  |  !! Concurrent conflicting proposals</span><br><span class="line"> |  |      |        |  |  |  |      |  |  !!   received in different order</span><br><span class="line"> |  |      |        |  |  |  |      |  |  !!   by the Acceptors</span><br><span class="line"> |  X--------------?|-?|-?|-?|      |  |  Accept!(N,I,V)</span><br><span class="line"> X-----------------?|-?|-?|-?|      |  |  Accept!(N,I,W)</span><br><span class="line"> |  |      |        |  |  |  |      |  |</span><br><span class="line"> |  |      |        |  |  |  |      |  |  !! Acceptors disagree on value</span><br><span class="line"> |  |      |&lt;-------X--X-&gt;|-&gt;|-----&gt;|-&gt;|  Accepted(N,I,V)冲突发生，由Leader来同步Acceptor</span><br><span class="line"> |  |      |&lt;-------|&lt;-|&lt;-X--X-----&gt;|-&gt;|  Accepted(N,I,W)</span><br><span class="line"> |  |      |        |  |  |  |      |  |</span><br><span class="line"> |  |      |        |  |  |  |      |  |  !! Detect collision &amp; recover</span><br><span class="line"> |  |      X-------&gt;|-&gt;|-&gt;|-&gt;|      |  |  Accept!(N+1,I,W)</span><br><span class="line"> |  |      |&lt;-------X--X--X--X-----&gt;|-&gt;|  Accepted(N+1,I,W)</span><br><span class="line"> |&lt;---------------------------------X--X  Response(W)</span><br><span class="line"> |  |      |        |  |  |  |      |  |</span><br></pre></td></tr></table></figure>
+<h4 id="Multi和Fast的区别"><a href="#Multi和Fast的区别" class="headerlink" title="Multi和Fast的区别"></a>Multi和Fast的区别</h4><p>​    两种算法从形式上比较相似，都只是由一轮RPC则可以确定一次提案。而两者之间的不同有：</p>
+<ol>
+<li>提案的提交者：Multi形式上只有一个Leader来提交提案，而Fast则是多个Proposer提交提案。</li>
+<li>两者Leader作用不同：Multi的Leader用于提交提案，即唯一的Proposer；而Fast的Leader主要用于解决冲突，平时的角色和Learner类似。</li>
+<li>Fast的客户端即作为了Proposer的角色，发送请求时与Proposer相同，发送给多个Acceptor。</li>
+</ol>
+<h2 id="Raft算法"><a href="#Raft算法" class="headerlink" title="Raft算法"></a>Raft算法</h2><p>​    Raft是一种强领导算法。详细示例可见<a href="https://raft.github.io/" target="_blank" rel="noopener">Raft算法动画演示</a>    与<a href="http://thesecretlivesofdata.com/raft/" target="_blank" rel="noopener">Raft算法演示网站</a></p>
+<h3 id="角色-3"><a href="#角色-3" class="headerlink" title="角色"></a>角色</h3><ul>
+<li>Leader：领导者，请求都通过Leader来发送。向Follower发送HeartBeat心跳检测，HeartBeat可能携带请求。</li>
+<li>Follower：跟随者，集群正常的情况下，则为记录员，每个Follower都有随机超时时间（每次收到HeartBeat随机重置），一旦在超时时间内没有收到来自与Leader的HeartBeat，则Follower升级为Candidate，该节点就会参与竞选。</li>
+<li>Candidate：候选者，一旦Timeout超时，Follower升级为Candidate，则可以竞选Leader。如果在选举时，发现了新的Leader，则会变为Follower。</li>
+</ul>
+<p><img src="./pic/Raft转换图状态.png" alt="Raft 状态转换图"></p>
+<h3 id="选举Leader"><a href="#选举Leader" class="headerlink" title="选举Leader"></a>选举Leader</h3><p>​    每个Follower都有一个Timeout，超时时间，如果在超时时间内，没有Leader发送的HeartBeat，那Follower则会变为Candidate发送选举请求，一旦超过半数的Follower同意，则新的Leader就选举出来了。</p>
+<ol>
+<li>第一种情况是初始情况，所有的Follower都升级为Candidate竞选Leader，所有Candidate竞选的Term都相同，则谁先获得半数同意，谁就是Leader。</li>
+<li>如果有一个Follower在任期N内超时，则自己升级为Candidate（称为X节点），X选择N+1任期，竞选Leader。这里有一个规则，<strong>如果一个Candidate或者Leader获得一个大于自身任期的RPC（即新的请求），那它们就直接更新自己的任期（即保持最新）</strong>，Candidate或者Leader自动降级为Follower；<strong>如果X的RPC’s Term小于Candidate或者Leader，Candidate或者Leader则拒绝该请求（注）。</strong><ul>
+<li>注：Candidate或者Leader拒绝RPC竞选请求时，需要检查源CandidateX的日志同步状态，根据Term选择是否要将源CandidateX进行日志更新同步，因为如果CandidateX的Term小于当前集群里的Term，大概率是之前X节点宕机了，而X恢复时又触发了超时，这个时候X是很有可能缺少一些日志的。所以需要Leader来帮助X节点同步。</li>
+</ul>
+</li>
+</ol>
+<h3 id="日志复制（信息同步）"><a href="#日志复制（信息同步）" class="headerlink" title="日志复制（信息同步）"></a>日志复制（信息同步）</h3><p>​    日志复制（Log Replication）主要作用是用于保证节点的一致性，这阶段所做的操作也是为了保证一致性与高可用性；</p>
+<p>​    当Leader选举出来后便开始负责客户端的请求，所有事务（更新操作）请求都必须先经过Leader处理，这些事务请求或说成命令也就是这里说的日志，我们都知道要保证节点的一致性就要保证每个节点都按顺序执行相同的操作序列。流程如下：</p>
+<hr>
+<ol>
+<li>Leader得到Client的日志（事务请求），Leader追加到本地日志中，并通过HeartBeat向Follower发送日志复制同步请求与日志追加内容（也可以理解为命令，例如 SET 5），</li>
+<li>Follower接收到日志后记录日志然后向Leader发送ACK，注意这时Follower只是发送了ACK，并没有写入本地磁盘中。</li>
+<li>当Leader收到大多数（n/2+1）Follower的ACK信息后将该日志设置为已提交并追加到本地磁盘中，并通知客户端并在下个heartbeat中Leader将通知所有的Follower将该日志存储在自己的本地磁盘中，并把自己事务号加1，表示完成了一次事务。</li>
+<li>Follower接收到日志写入的命令，将日志写入本地磁盘。</li>
+</ol>
+<hr>
+<h3 id="安全性"><a href="#安全性" class="headerlink" title="安全性"></a>安全性</h3><p>​    安全性是用于保证每个节点都执行相同序列并保持阶段一致性的安全机制，如当某个Follower在当前Leader commit Log时变得不可用了，稍后可能该Follower又会倍选举为Leader，这时新Leader可能会用新的Log覆盖先前已committed的Log，这就是导致节点执行不同序列Safety就是用于保证选举出来的Leader一定包含先前 commited Log的机制；</p>
+<ul>
+<li>选举安全性（Election Safety）<ul>
+<li>每个Term只能选举出一个Leader</li>
+</ul>
+</li>
+<li>Leader完整性（Leader Completeness）<ul>
+<li>这里所说的完整性是指Leader日志的完整性，<strong>当Log在Term1被Commit后，那么以后Term2、Term3…等的Leader必须包含该Log</strong>；<strong>Raft在选举阶段就使用Term的判断用于保证完整性</strong>：当请求投票的该Candidate的Term较大或Term相同Index更大则投票，否则拒绝该请求；因为如果新竞选的节点X的Term小于当前Term时，则X是需要Leader来进行日志同步的，需要将X之前少的日志都补上。X也就谈不上竞选了。</li>
+</ul>
+</li>
+</ul>
+<h2 id="ZAB（Zookeeper-原子广播协议）"><a href="#ZAB（Zookeeper-原子广播协议）" class="headerlink" title="ZAB（Zookeeper 原子广播协议）"></a>ZAB（Zookeeper 原子广播协议）</h2><p>​    Zookeeper 是一个为分布式应用提供高效且可靠的分布式协调服务。在解决分布式一致性方面，Zookeeper 并没有使用 Paxos ，而是采用了 ZAB 协议。</p>
+<p>​    <strong>ZAB 协议是为分布式协调服务 Zookeeper 专门设计的一种支持 崩溃恢复 和 原子广播 协议</strong>。</p>
+<h3 id="节点状态"><a href="#节点状态" class="headerlink" title="节点状态"></a>节点状态</h3><p>节点可能的状态有以下四种</p>
+<ul>
+<li><strong>following</strong>：当前节点是跟随者，服从 leader 节点的命令</li>
+<li><strong>leading</strong>：当前节点是 leader，负责协调事务</li>
+<li><strong>election/looking</strong>：节点处于选举状态，或者是新加入节点，该节点处于恢复模式</li>
+<li><strong>observing</strong>： 观察状态，不参与选举。相当于记录员</li>
+</ul>
+<p>节点中包含以下属性：</p>
+<ul>
+<li><strong>history</strong>：当前节点接收到事务提议的 log</li>
+<li><strong>acceptedEpoch</strong>：follower 已经接受的 leader 更改年号的 NEWEPOCH 提议</li>
+<li><strong>currentEpoch</strong>：当前所处的年代</li>
+<li><strong>lastZxid</strong>：history 中最近接收到的提议的 zxid （最大的）</li>
+</ul>
+<h3 id="ZXID"><a href="#ZXID" class="headerlink" title="ZXID"></a>ZXID</h3><p>​    zxid是一个64位的数字，前32位是Epoch纪元号，表达现在是哪个Leader在领导，每次一个leader被选出来，它都会有一个新的epoch，类似与Raft中的Term；后32位是事件号，表示现在的同步流程。</p>
+<p>​    低 32 位是消息计数器，每接收到一条消息这个值 +1，新 leader 选举后这个值重置为 0。这样设计的好处是旧的 leader 挂了后重启，它不会被选举为 leader，因为此时它的 zxid 肯定小于当前的新 leader。当旧的 leader 作为 follower 接入新的 leader 后，<strong>新的 leader 会让它将所有的拥有旧的 epoch 号的未被  COMMIT 的 proposal 清除。</strong></p>
+<h3 id="崩溃恢复"><a href="#崩溃恢复" class="headerlink" title="崩溃恢复"></a>崩溃恢复</h3><p>​    如果leader服务器发生崩溃，则zab协议要求zookeeper集群进行崩溃恢复和leader服务器选举。</p>
+<p>​    ZAB协议崩溃恢复要求满足如下2个要求：</p>
+<p>​        <strong>1）确保已经被leader提交Commit的proposal必须最终被所有的follower服务器提交。</strong> </p>
+<p>​        <strong>2）确保丢弃已经被leader出的但是没有被提交Commit的proposal。</strong></p>
+<p>​    其实以上的要求就要保证新选举出来的leader不能包含未提交的proposal，即新选举的leader必须都是已经提交了的proposal的follower服务器节点。同时，新选举的leader节点中含有最高的ZXID。<strong>这一切都由ZXID和选举逻辑完成的</strong>。原理如下：</p>
+<ul>
+<li><p>​    <strong>确保Commit提交</strong>：因为选举逻辑就是选出ZXID最大的节点，一旦前任Leader的最后一次Commit有节点操作了，那该节点的ZXID必然最大（因为Commit后LastZXID更新了），也就必然是下一轮的Leader，那新Leader必然会与其他的Follower同步，将前任Leader最后一次Commit同步到所有节点。</p>
+</li>
+<li><p>​    <strong>丢弃未Commit的事务</strong>：而如果前任Leader最后一次操作为ACK但未Commit，那新Leader必然没有更新这一次的ZXID，又因为新Leader选举出来后，事务号会清零，那Follower就必然丢弃了前任Leader未Commit的操作。（此处有争议，具体实现可能不同，可能新Leader在检查所有Follower状态时会根据Follower中已ACK的数量来决定这次事务是否同步）。</p>
+</li>
+</ul>
+<p>​    下面来介绍ZAB在崩溃恢复中的选举逻辑FastLeaderElection。</p>
+<hr>
+<ol>
+<li>当leader崩溃或者leader失去大多数的follower，或者初始状态，这时候zk进入恢复模式，恢复模式需要重新选举出一个新的leader，让所有的server都恢复到一个正确的状态。Follower状态为Looking。</li>
+<li>选举线程由当前节点发起选举的线程担任，功能是对投票结果进行统计，并选出leader。</li>
+<li>选举线程首先向所有 Server 发起一次询问(包括自己)，获得当前所有节点的状态信息。（第一轮发起推荐）</li>
+<li>选举线程收到回复后，验证是否是自己发起的询问(验证 zxid 是否一致)，然后获取对方 的 节点id(myid)，并存储到当前询问对象列表中，最后获取对方提议的 leader 相关信息 (节点id,zxid)，并将这些信息存储到当次选举的投票记录表中。（第一轮获得推荐）</li>
+<li><p>收到所有 Server 回复以后，就计算出 id 最大的那个 Server，并将这个 Server 相关信息设 置成下一次要投票的节点（计算ID的规则如下）</p>
+<ol>
+<li><strong>Epoch小的选举结果被忽略，重新投票。</strong></li>
+<li><strong>统一Epoch后，事件号大的胜出，</strong></li>
+<li><strong>事件号相同的情况下，节点 id 大的胜出</strong></li>
+</ol>
+</li>
+<li><p>线程将当前 id 最大的 Server 设置为当前 Server 要推荐的 Leader，如果此时获胜的 Server 获得 n/2 + 1 的 Server 票数， 设置当前推荐的 leader 为获胜的 Server，将根据获胜的 Server 相关信息设置自己的状态，否则，继续这个过程，直到 leader 被选举出来。（第二轮确定Leader）（注）</p>
+</li>
+</ol>
+<p><strong>注</strong>：如果在选举完成后一个新的或者是宕机恢复的节点 加入zookeeper服务中，它会在恢复模式（Looking）下启动，<strong>每个节点启动以后都询问其它节点它要投票给谁</strong>，直到发现leader，并和leader进行状态同步。待到同步结束，它也参与消息广播。</p>
+<p><strong>注</strong>：在zookeeper集群中新的leader选举成功之后，<strong>leader会将自身的提交的最大proposal的事物ZXID发送给其他的follower节点。follower节点会根据leader的消息和自己的lastZxid进行回退或者是数据同步操作。</strong>最终目的要保证集群中所有节点的数据副本保持一致。</p>
+<hr>
+<h3 id="消息广播"><a href="#消息广播" class="headerlink" title="消息广播"></a>消息广播</h3><p>​    类似一个 <strong>二阶段提交过程</strong>。对于客户端发送的写请求，全部由 Leader 接收，Leader 将请求封装成一个事务 提案，将其发送给所有 Follower ，然后，根据所有 Follower 的反馈，如果超过半数成功响应，则执行 commit 操作（先提交自己，再发送 commit 给所有 Follower）。其实这里的和Raft的日志同步非常相似。</p>
+<hr>
+<ol>
+<li>Leader得到Client的日志（事务请求），Leader追加到本地日志中，并通过HeartBeat向Follower发送日志复制同步请求与日志追加内容（也可以理解为命令，例如 SET 5），</li>
+<li>Follower接收到日志后记录日志然后向Leader发送ACK，注意这时Follower只是发送了ACK，并没有写入本地磁盘中。</li>
+<li>当Leader收到大多数（n/2+1）Follower的ACK信息后，将该日志设置为已提交并追加到Leader本地磁盘中，并通知客户端并在下个heartbeat中Leader将通知所有的Follower将该日志存储在自己的本地磁盘中（即Commit操作），并把自己事务号加1，表示完成了一次事务。</li>
+<li>Follower接收到日志写入Commit的命令，将日志写入Follower本地磁盘。</li>
+</ol>
+<hr>
+<h3 id="ZAB和Raft的异同"><a href="#ZAB和Raft的异同" class="headerlink" title="ZAB和Raft的异同"></a>ZAB和Raft的异同</h3><p>ZAB和Raft有很多相似的地方，比如几乎相同的日志同步机制，几乎相同的Leader同步断连的Follower的思想，基本相同的Leader选择逻辑，都是靠Epoch(Term)和事务号来解决数据同步问题。不过它们还有一些不同之处。</p>
+<ol>
+<li>ZAB的心跳检查是由Follower发至Leader或者Follower，而Raft是由Leader发送至Follower。</li>
+<li>ZAB的选举模式是由一个结点统一记录投票情况，并有两轮确定，第一次是确定推荐，第二次确定Leader。而Raft由各个节点自己统计自己的得票情况，并且一旦Term和事务号满足大于条件，则直接获得成为Leader，只有一轮确定。</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>​    </p>
+<p>参考链接</p>
+<p><a href="https://en.wikipedia.org/wiki/Paxos_(computer_science" target="_blank" rel="noopener">Paxos (computer science) -Wikipedia</a>)</p>
+<p><a href="https://zhuanlan.zhihu.com/p/25664121" target="_blank" rel="noopener">比较raft ，basic paxos以及multi-paxos - 知乎</a></p>
+<p><a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tr-2005-112.pdf" target="_blank" rel="noopener">Fast Paxos - Leslie Lamport</a></p>
+<p><a href="https://raft.github.io/" target="_blank" rel="noopener">Raft算法动画演示</a>    </p>
+<p><a href="http://thesecretlivesofdata.com/raft/" target="_blank" rel="noopener">Raft算法演示网站</a></p>
+<p><a href="https://www.jianshu.com/p/fb527a64deee" target="_blank" rel="noopener">Zab：Zookeeper 中的分布式一致性协议介绍</a></p>
+<p><a href="https://blog.csdn.net/a724888/article/details/80757503" target="_blank" rel="noopener">ZAB协议概述与选主流程详解</a></p>
+
+    </article>
+    <!-- license  -->
+    
+        <div class="license-wrapper">
+            <p>原文作者：<a href="http://kylinrix.github.io">Ky Li</a>
+            <p>原文链接：<a href="http://kylinrix.github.io/2018/12/20/分布式一致性算法/">http://kylinrix.github.io/2018/12/20/分布式一致性算法/</a>
+            <p>发表日期：<a href="http://kylinrix.github.io/2018/12/20/分布式一致性算法/">December 20th 2018, 9:01:03 pm</a>
+            <p>更新日期：<a href="http://kylinrix.github.io/2018/12/20/分布式一致性算法/">December 20th 2018, 9:09:28 pm</a>
+            <p>版权声明：本文采用<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">知识共享署名-非商业性使用 4.0 国际许可协议</a>进行许可</p>
+        </div>
+    
+    <!-- paginator  -->
+    <ul class="post-paginator">
+        <li class="next">
+            
+        </li>
+        <li class="previous">
+            
+                <div class="prevSlogan">Previous Post</div>
+                <a href= "/2018/12/18/Java NIO/" title= "Java NIO">
+                    <div class="prevTitle">Java NIO</div>
+                </a>
+            
+        </li>
+    </ul>
+    <!-- 评论插件 -->
+    <!-- 来必力City版安装代码 -->
+
+<!-- City版安装代码已完成 -->
+    
+    
+    <!-- partial('_partial/comment/changyan') -->
+    <!--PC版-->
+
+
+    
+    
+
+    <!-- 评论 -->
+</main>
+            <!-- profile -->
+            
+        </div>
+        <footer class="footer footer-unloaded">
+    <!-- social  -->
+    
+    <div class="social">
+        
+    
+        
+            
+                <a href="mailto:Kylinrix@outlook.com" class="iconfont-archer email" title=email ></a>
+            
+        
+    
+        
+            
+                <a href="//github.com/Kylinrix" class="iconfont-archer github" target="_blank" title=github></a>
+            
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+    </div>
+    
+    <!-- powered by Hexo  -->
+    <div class="copyright">
+        <span id="hexo-power">Powered by <a href="https://hexo.io/" target="_blank">Hexo</a></span><span class="iconfont-archer power">&#xe635;</span><span id="theme-info">theme <a href="https://github.com/fi3ework/hexo-theme-archer" target="_blank">Archer</a></span>
+    </div>
+    <!-- 不蒜子  -->
+    
+</footer>
+    </div>
+    <!-- toc -->
+    
+    <div class="toc-wrapper" style=
+    
+
+
+
+
+
+
+
+top:50vh;
+
+    >
+        <div class="toc-catalog">
+            <span class="iconfont-archer catalog-icon">&#xe613;</span><span>CATALOG</span>
+        </div>
+        <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#分布式一致性算法"><span class="toc-number">1.</span> <span class="toc-text">分布式一致性算法</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Paxos算法"><span class="toc-number">1.1.</span> <span class="toc-text">Paxos算法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Basic-Paxos"><span class="toc-number">1.1.1.</span> <span class="toc-text">Basic Paxos</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#角色"><span class="toc-number">1.1.1.1.</span> <span class="toc-text">角色</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#请求与响应"><span class="toc-number">1.1.1.2.</span> <span class="toc-text">请求与响应</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#流程"><span class="toc-number">1.1.1.3.</span> <span class="toc-text">流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺陷"><span class="toc-number">1.1.1.4.</span> <span class="toc-text">缺陷</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Multi-Paxos"><span class="toc-number">1.1.2.</span> <span class="toc-text">Multi Paxos</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#角色-1"><span class="toc-number">1.1.2.1.</span> <span class="toc-text">角色</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#流程-1"><span class="toc-number">1.1.2.2.</span> <span class="toc-text">流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#确定Leader"><span class="toc-number">1.1.2.3.</span> <span class="toc-text">确定Leader</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Fast-Paxos"><span class="toc-number">1.1.3.</span> <span class="toc-text">Fast Paxos</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#角色-2"><span class="toc-number">1.1.3.1.</span> <span class="toc-text">角色</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Any消息"><span class="toc-number">1.1.3.2.</span> <span class="toc-text">Any消息</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#流程-2"><span class="toc-number">1.1.3.3.</span> <span class="toc-text">流程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#无冲突流程"><span class="toc-number">1.1.3.3.1.</span> <span class="toc-text">无冲突流程</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#冲突流程"><span class="toc-number">1.1.3.3.2.</span> <span class="toc-text">冲突流程</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Multi和Fast的区别"><span class="toc-number">1.1.3.4.</span> <span class="toc-text">Multi和Fast的区别</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Raft算法"><span class="toc-number">1.2.</span> <span class="toc-text">Raft算法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#角色-3"><span class="toc-number">1.2.1.</span> <span class="toc-text">角色</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#选举Leader"><span class="toc-number">1.2.2.</span> <span class="toc-text">选举Leader</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#日志复制（信息同步）"><span class="toc-number">1.2.3.</span> <span class="toc-text">日志复制（信息同步）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#安全性"><span class="toc-number">1.2.4.</span> <span class="toc-text">安全性</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ZAB（Zookeeper-原子广播协议）"><span class="toc-number">1.3.</span> <span class="toc-text">ZAB（Zookeeper 原子广播协议）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#节点状态"><span class="toc-number">1.3.1.</span> <span class="toc-text">节点状态</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ZXID"><span class="toc-number">1.3.2.</span> <span class="toc-text">ZXID</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#崩溃恢复"><span class="toc-number">1.3.3.</span> <span class="toc-text">崩溃恢复</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#消息广播"><span class="toc-number">1.3.4.</span> <span class="toc-text">消息广播</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ZAB和Raft的异同"><span class="toc-number">1.3.5.</span> <span class="toc-text">ZAB和Raft的异同</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#总结"><span class="toc-number">1.4.</span> <span class="toc-text">总结</span></a></li></ol></li></ol>
+    </div>
+    
+    <div class="back-top iconfont-archer">&#xe639;</div>
+    <div class="sidebar sidebar-hide">
+    <ul class="sidebar-tabs sidebar-tabs-active-0">
+        <li class="sidebar-tab-archives"><span class="iconfont-archer">&#xe67d;</span><span class="tab-name">Archive</span></li>
+        <li class="sidebar-tab-tags"><span class="iconfont-archer">&#xe61b;</span><span class="tab-name">Tag</span></li>
+        <li class="sidebar-tab-categories"><span class="iconfont-archer">&#xe666;</span><span class="tab-name">Cate</span></li>
+    </ul>
+    <div class="sidebar-content sidebar-content-show-archive">
+          <div class="sidebar-panel-archives">
+    <!-- 在ejs中将archive按照时间排序 -->
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <div class="total-and-search">
+        <div class="total-archive">
+        Total : 4
+        </div>
+        <!-- search  -->
+        
+    </div>
+    
+    <div class="post-archive">
+    
+    
+    
+    
+    <div class="archive-year"> 2018 </div>
+    <ul class="year-list">
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">12/20</span><a class="archive-post-title" href= "/2018/12/20/分布式一致性算法/" >分布式一致性算法</a>
+        </li>
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">12/18</span><a class="archive-post-title" href= "/2018/12/18/Java NIO/" >Java NIO</a>
+        </li>
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">12/14</span><a class="archive-post-title" href= "/2018/12/14/常用设计模式/" >常用设计模式</a>
+        </li>
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">10/12</span><a class="archive-post-title" href= "/2018/10/12/Hadoop MapReduce 编程Demo/" >Hadoop MapReduce Idea Demo</a>
+        </li>
+    
+    </div>
+  </div>
+        <div class="sidebar-panel-tags">
+    <div class="sidebar-tags-name">
+    
+        <span class="sidebar-tag-name" data-tags="Hadoop"><span class="iconfont-archer">&#xe606;</span>Hadoop</span>
+    
+        <span class="sidebar-tag-name" data-tags="MapReduce"><span class="iconfont-archer">&#xe606;</span>MapReduce</span>
+    
+        <span class="sidebar-tag-name" data-tags="NIO"><span class="iconfont-archer">&#xe606;</span>NIO</span>
+    
+        <span class="sidebar-tag-name" data-tags="Java"><span class="iconfont-archer">&#xe606;</span>Java</span>
+    
+        <span class="sidebar-tag-name" data-tags="分布式"><span class="iconfont-archer">&#xe606;</span>分布式</span>
+    
+        <span class="sidebar-tag-name" data-tags="Paxos算法"><span class="iconfont-archer">&#xe606;</span>Paxos算法</span>
+    
+        <span class="sidebar-tag-name" data-tags="Raft算法"><span class="iconfont-archer">&#xe606;</span>Raft算法</span>
+    
+        <span class="sidebar-tag-name" data-tags="Zookeeper"><span class="iconfont-archer">&#xe606;</span>Zookeeper</span>
+    
+        <span class="sidebar-tag-name" data-tags="设计模式"><span class="iconfont-archer">&#xe606;</span>设计模式</span>
+    
+    </div>
+    <div class="iconfont-archer sidebar-tags-empty">&#xe678;</div>
+    <div class="tag-load-fail" style="display: none; color: #ccc; font-size: 0.6rem;">
+    缺失模块。<br/>
+    1、请确保node版本大于6.2<br/>
+    2、在博客根目录（注意不是archer根目录）执行以下命令：<br/>
+    <span style="color: #f75357; font-size: 1rem; line-height: 2rem;">npm i hexo-generator-json-content --save</span><br/>
+    3、在根目录_config.yml里添加配置：
+    <pre style="color: #787878; font-size: 0.6rem;">
+jsonContent:
+  meta: false
+  pages: false
+  posts:
+    title: true
+    date: true
+    path: true
+    text: false
+    raw: false
+    content: false
+    slug: false
+    updated: false
+    comments: false
+    link: false
+    permalink: false
+    excerpt: false
+    categories: true
+    tags: true</pre>
+    </div> 
+    <div class="sidebar-tags-list"></div>
+</div>
+        <div class="sidebar-panel-categories">
+    <div class="sidebar-categories-name">
+    
+        <span class="sidebar-category-name" data-categories="Hadoop"><span class="iconfont-archer">&#xe60a;</span>Hadoop</span>
+    
+        <span class="sidebar-category-name" data-categories="java"><span class="iconfont-archer">&#xe60a;</span>java</span>
+    
+        <span class="sidebar-category-name" data-categories="分布式"><span class="iconfont-archer">&#xe60a;</span>分布式</span>
+    
+        <span class="sidebar-category-name" data-categories="设计模式"><span class="iconfont-archer">&#xe60a;</span>设计模式</span>
+    
+    </div>
+    <div class="iconfont-archer sidebar-categories-empty">&#xe678;</div>
+    <div class="sidebar-categories-list"></div>
+</div>
+    </div>
+</div> 
+    <script>
+    var siteMeta = {
+        root: "/",
+        author: "Ky Li"
+    }
+</script>
+    <!-- CDN failover -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+    <script type="text/javascript">
+        if (typeof window.$ === 'undefined')
+        {
+            console.warn('jquery load from jsdelivr failed, will load local script')
+            document.write('<script src="/lib/jquery.min.js">\x3C/script>')
+        }
+    </script>
+    <script src="/scripts/main.js"></script>
+    <!-- algolia -->
+    
+    <!-- busuanzi  -->
+    
+    <!-- CNZZ  -->
+    
+    </div>
+    <!-- async load share.js -->
+    
+        <script src="/scripts/share.js" async></script>    
+     
+    </body>
+</html>
+
+
